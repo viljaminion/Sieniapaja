@@ -3,12 +3,12 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Etusivu from './Etusivu'
 import Havainnot from './Havainnot'
-
-
+ 
 const Tab = createBottomTabNavigator();
 
 
 export default function App() {
+
   return (
     <NavigationContainer>
     <Tab.Navigator

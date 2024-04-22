@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Text, Alert, Button, StyleSheet, TextInput, View, Modal } from 'react-native';
+import {ImageBackground, Text, Alert, Button, StyleSheet, TextInput, View, Modal, ScrollView, KeyboardAvoidingView } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { APIKEY } from './salaisuuksia';
+import DatabaseHavainnot from './DatabaseHavainnot';
 
 export default function App() {
   const [address, setAddress] = useState('');
@@ -12,6 +13,34 @@ export default function App() {
   const [savedMarkers, setSavedMarkers] = useState([]);
   const [markerName, setMarkerName] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isDatabaseInitialized, setIsDatabaseInitialized] = useState(false);
+
+  useEffect(() => {
+    DatabaseHavainnot.init()
+      .then(() => {
+        console.log('Database initialized successfully');
+        setIsDatabaseInitialized(true);
+      })
+      .catch(error => {
+        console.error('Error initializing database: ', error);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (isDatabaseInitialized) {
+      fetchMarkersFromDatabase();
+    }
+  }, [isDatabaseInitialized]);
+
+  const fetchMarkersFromDatabase = () => {
+    DatabaseHavainnot.getMarkers()
+      .then(markers => {
+        setSavedMarkers(markers);
+      })
+      .catch(error => {
+        console.error('Error fetching markers from database: ', error);
+      });
+  };
 
   async function getLocation() {
     let { status } = await Location.requestForegroundPermissionsAsync();
@@ -85,110 +114,187 @@ export default function App() {
   };
 
   const saveMarkerWithPopup = () => {
-    const roundedCoords = {
-      latitude: parseFloat(coords.latitude.toFixed(3)),
-      longitude: parseFloat(coords.longitude.toFixed(3)),
-      name: markerName
-    };
-    
-    setSavedMarkers([...savedMarkers, roundedCoords]);
-    setMarkerName(''); 
-    setIsModalVisible(false);
-    Alert.alert('Marker saved successfully');
+    if (coords) {
+      console.log('Saving marker:', coords);
+      const roundedCoords = {
+        latitude: parseFloat(coords.latitude.toFixed(3)),
+        longitude: parseFloat(coords.longitude.toFixed(3)),
+        name: markerName
+      };
+      
+      // Save marker to the database
+      DatabaseHavainnot.saveMarker(roundedCoords)
+        .then(() => {
+          // If marker is saved successfully, update the savedMarkers state
+          console.log('Marker saved successfully:', roundedCoords);
+          setSavedMarkers([...savedMarkers, roundedCoords]);
+          setMarkerName('');
+          setIsModalVisible(false);
+          Alert.alert('Marker saved successfully');
+        })
+        .catch(error => {
+          // Handle error if marker couldn't be saved
+          console.error('Error saving marker: ', error);
+          Alert.alert('Failed to save marker');
+        });
+    } else {
+      Alert.alert('Select a location on the map');
+    }
   };
 
-  return (
-    <View style={styles.container}>
-      <TextInput
-        style={styles.input}
-        placeholder="Address or coordinates (latitude, longitude)"
-        value={address}
-        onChangeText={setAddress}
-      />
-      <Button title="Show" onPress={showLocation} />
-      <Button title="Save" onPress={saveMarker} />
-      {mapRegion && (
-        <MapView
-        style={styles.map}
-        initialRegion={mapRegion}
-        region={mapRegion}
-        onRegionChange={setMapRegion}
-        showsUserLocation={true}
-        onPress={handleMapPress}
-      >
-        {savedMarkers.map((marker, index) => (
-          <Marker
-            key={index}
-            coordinate={marker}
-            title={marker.name || 'Unknown marker'}
-          >
-            <Callout>
-              <View>
-                <Text>{marker.name || 'Unknown marker'}</Text>
-              </View>
-            </Callout>
-          </Marker>
-        ))}
-        {coords && (
-          <Marker
-            coordinate={coords}
-            title="Selected Location"
-          />
-        )}
-      </MapView>
-      )}
+  const showMarkerOnMap = (marker) => {
+    // Set the map region to the coordinates of the marker
+    const newRegion = {
+      latitude: marker.latitude,
+      longitude: marker.longitude,
+      latitudeDelta: 0.0322,
+      longitudeDelta: 0.0221,
+    };
+    setMapRegion(newRegion);
+  };
 
-      <View style={styles.savedMarkersContainer}>
-        <Text style={styles.savedMarkersHeader}>Saved Markers:</Text>
-        {savedMarkers.map((marker, index) => (
-          <Text key={index} style={styles.savedMarker}>
-            {`Marker ${index + 1}: ${marker.name || 'Unnamed'} - Latitude ${marker.latitude}, Longitude ${marker.longitude}`}
-          </Text>
-        ))}
-      </View>
+  const deleteMarker = (id) => {
+    // Remove marker from the list
+    const updatedMarkers = savedMarkers.filter(marker => marker.id !== id);
+    setSavedMarkers(updatedMarkers);
+    
+    // Remove marker from the database
+    DatabaseHavainnot.deleteMarker(id)
+      .then(() => {
+        console.log('Marker deleted successfully');
+      })
+      .catch(error => {
+        console.error('Error deleting marker: ', error);
+      });
+  };
 
-      <Modal // Lähde : https://reactnative.dev/docs/modal
-        visible={isModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <TextInput
-            style={styles.modalInput}
-            placeholder="Enter marker name"
-            value={markerName}
-            onChangeText={setMarkerName}
-          />
-          <Button title="Save Marker" onPress={saveMarkerWithPopup} />
-        </View>
-      </Modal>
+return (
+  <ImageBackground source={require('./images/expobackground.png')} style={styles.background}>
+    <KeyboardAvoidingView style={styles.container} behavior="padding" enabled>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <TextInput
+          style={styles.input}
+          placeholder="Address or coordinates (latitude, longitude)"
+          value={address}
+          onChangeText={setAddress}
+        />
+    <View style={styles.buttonContainer}>
+        <Button title="Show" onPress={showLocation} />
+        <Button title="Save" onPress={saveMarker} />
     </View>
+      {mapRegion && (
+         <MapView
+           style={styles.map}
+           initialRegion={mapRegion}
+           region={mapRegion}
+           onRegionChangeComplete={setMapRegion}
+           showsUserLocation={true}
+           onPress={handleMapPress}
+          >
+            {savedMarkers.map((marker, index) => (
+              <Marker
+                key={index}
+                coordinate={marker}
+                title={marker.name || 'Unknown marker'}
+              >
+                <Callout>
+                  <View>
+                    <Text>{marker.name || 'Unknown marker'}</Text>
+                  </View>
+                </Callout>
+              </Marker>
+            ))}
+            {coords && (
+              <Marker
+                coordinate={coords}
+                title="Selected Location"
+              />
+            )}
+          </MapView>
+        )}
+
+        
+    <View style={styles.savedMarkersContainer}>
+       <Text style={styles.savedMarkersHeader}>Saved Markers:</Text>
+        {savedMarkers.map((marker, index) => (
+    <View key={index} style={styles.savedMarkerContainer}>
+        <Text style={styles.savedMarkerText}>
+          {`${index + 1}: ${marker.name || 'Unnamed'} - Lat ${marker.latitude}, Lon ${marker.longitude}`}
+        </Text>
+    <View style={styles.markerButtons}>
+          <Button title="Look" onPress={() => showMarkerOnMap(marker)} />
+          <Button title="Delete" onPress={() => deleteMarker(marker.id)} />
+    </View>
+    </View>
+    ))}
+  </View>
+
+        <Modal
+          visible={isModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setIsModalVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Enter marker name"
+              value={markerName}
+              onChangeText={setMarkerName}
+            />
+            <Button title="Save Marker" onPress={saveMarkerWithPopup} />
+          </View>
+        </Modal>
+      </ScrollView>
+    </KeyboardAvoidingView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  background: {
+    flex: 1,
+    resizeMode: 'cover',
+    justifyContent: 'center',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   input: {
     width: '80%',
     marginBottom: 10,
     padding: 10,
-    borderWidth: 1,
+    borderWidth: 5,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    backgroundColor: '#fff', // Set background color to white
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '80%',
+    marginBottom: 10,
+  },
+  map: {
+    width: '90%',
+    height: 300,
+    marginTop: 20,
+    borderWidth: 2,
     borderColor: '#ccc',
     borderRadius: 5,
   },
-  map: {
-    width: '100%',
-    height: 300,
-    marginTop: 20,
-  },
   savedMarkersContainer: {
     marginTop: 20,
+    borderColor: '#ccc',
+    borderWidth: 5,
+    borderRadius: 5,
+    backgroundColor: '#fff'
   },
   savedMarkersHeader: {
     fontSize: 18,
@@ -198,6 +304,12 @@ const styles = StyleSheet.create({
   savedMarker: {
     fontSize: 16,
     marginBottom: 3,
+  },
+  markerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '80%',
+    marginBottom: 5,
   },
   modalContainer: {
     flex: 1,
