@@ -15,22 +15,21 @@ export default function App() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isDatabaseInitialized, setIsDatabaseInitialized] = useState(false);
 
+
+//Tietokannan alustus
+
   useEffect(() => {
     DatabaseHavainnot.init()
       .then(() => {
-        console.log('Database initialized successfully');
+        console.log('Database set successfully');
         setIsDatabaseInitialized(true);
       })
       .catch(error => {
-        console.error('Error initializing database: ', error);
+        console.error('Error setting database: ', error);
       });
   }, []);
 
-  useEffect(() => {
-    if (isDatabaseInitialized) {
-      fetchMarkersFromDatabase();
-    }
-  }, [isDatabaseInitialized]);
+//Jo tallennettujen sienipaikka-markerien haku tietokannasta
 
   const fetchMarkersFromDatabase = () => {
     DatabaseHavainnot.getMarkers()
@@ -42,12 +41,22 @@ export default function App() {
       });
   };
 
+  useEffect(() => {
+    if (isDatabaseInitialized) {
+      fetchMarkersFromDatabase();
+    }
+  }, [isDatabaseInitialized]);
+
+//Sijaintipalveluiden käytön lupapyyntö
+
   async function getLocation() {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('No permission to get location');
       return;
     }
+
+//Kartan aloitussijainnin haku käyttäjän tämänhetkisestä sijainnista
 
     let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
     setLocation(location);
@@ -66,29 +75,45 @@ export default function App() {
     getLocation();
   }, []);
 
+//Sijainnin haku kartalta käyttäjän syötteen perusteella
+
   const showLocation = async () => {
     if (!address) {
       Alert.alert('Set address or coordinates');
       return;
     }
 
+//Koordinaattien alustus
+
     let lat, lon;
-    if (address.includes(',')) {
+    
+//Mikäli syötteessä pilkku,
+//sovellus olettaa syötteen olevan koordinaattimuotoinen
+
+    if (address.includes(',')) { 
       const [latitude, longitude] = address.split(',');
       lat = parseFloat(latitude.trim());
       lon = parseFloat(longitude.trim());
-    } else {
+
+//Jos ei pilkkua, sovellus tulkitsee syötteen olevan osoite
+
+//Sovellus käyttää APIa, pyynnön mukana lähtee API-avain ja osoite.
+//API palauttaa JSON-dataa, josta sovellus poimii koordinaatit ja sijoittaa
+//ne alustettuihin 'lat' ja 'lon' variaabeleihin
+
+    } else { 
       const response = await fetch(`https://geocode.maps.co/search?q=${address}&api_key=${APIKEY}`);
       const data = await response.json();
       if (data && data.length > 0) {
         lat = parseFloat(data[0].lat);
         lon = parseFloat(data[0].lon);
       } else {
-        Alert.alert('Error, address not found');
+        Alert.alert('Error, address not found'); //Virheilmoitus jos osoitetta ei löydy
         return;
       }
     }
 
+//Karttakuva päivittyy syötteen perustella uuteen sijaintiin
     const newRegion = {
       latitude: lat,
       longitude: lon,
@@ -99,11 +124,15 @@ export default function App() {
     setMapRegion(newRegion);
   };
 
+//Karttaa täpätessä sovellus poimii syötekenttään koordinaatit
   const handleMapPress = (event) => {
     const { coordinate } = event.nativeEvent;
     setCoords(coordinate);
     setAddress(`${coordinate.latitude}, ${coordinate.longitude}`);
   };
+
+//Markerin tallennus: Avaa Modal-popup ikkunan painettaessa 'Save'
+//Lähde:  "https://reactnative.dev/docs/modal"
 
   const saveMarker = () => {
     if (coords) {
@@ -113,37 +142,48 @@ export default function App() {
     }
   };
 
+//Modalissa tekstikenttä jossa voi nimetä Markerin
+//Modalissa painike "Save marker", joka käynnistää seuraavan funktion;
+
   const saveMarkerWithPopup = () => {
     if (coords) {
       console.log('Saving marker:', coords);
       const roundedCoords = {
+//Koordinaatit supistetaan kolmen desimaalin tarkkuuteen,
+//normaali pyöristys esimerkiksi geokätköilypiireissä
         latitude: parseFloat(coords.latitude.toFixed(3)),
         longitude: parseFloat(coords.longitude.toFixed(3)),
-        name: markerName
+        name: markerName //Markerin nimi
       };
       
-      // Save marker to the database
+//Markerin tallennus tietokantaan
       DatabaseHavainnot.saveMarker(roundedCoords)
         .then(() => {
-          // If marker is saved successfully, update the savedMarkers state
           console.log('Marker saved successfully:', roundedCoords);
+//Sen onnistuttua, päivitetään lisätty tieto myös savedMarkers arrayyn
+//lokaalisti
+
           setSavedMarkers([...savedMarkers, roundedCoords]);
           setMarkerName('');
           setIsModalVisible(false);
           Alert.alert('Marker saved successfully');
         })
         .catch(error => {
-          // Handle error if marker couldn't be saved
+//Mikäli jotain menee vikaan, ilmoitus tulee sekä konsoliin että
+//sovellusnäkymään
           console.error('Error saving marker: ', error);
           Alert.alert('Failed to save marker');
         });
+//Mikäli yritetään tallentaa tyhjää tietoa;
     } else {
       Alert.alert('Select a location on the map');
     }
   };
 
+//Tallennetuissa markereissa 'Look' painike, joka vie kartan
+//markerin osoittamaan paikkaan. 'Look' laukaisee seuraavan funktion;
+
   const showMarkerOnMap = (marker) => {
-    // Set the map region to the coordinates of the marker
     const newRegion = {
       latitude: marker.latitude,
       longitude: marker.longitude,
@@ -153,24 +193,46 @@ export default function App() {
     setMapRegion(newRegion);
   };
 
+//Markerin poisto tietokannasta 'Delete'-nappia painettaessa
+
   const deleteMarker = (id) => {
-    // Remove marker from the list
-    const updatedMarkers = savedMarkers.filter(marker => marker.id !== id);
-    setSavedMarkers(updatedMarkers);
-    
-    // Remove marker from the database
     DatabaseHavainnot.deleteMarker(id)
       .then(() => {
         console.log('Marker deleted successfully');
+
+//Tämän jälkeen vielä markerin poisto listalta
+//Päivitetty markerlista, josta on filter-funktion avulla
+//suodatettu haluttu marker pois ID:n perusteella
+
+
+    const updatedMarkers = savedMarkers.filter(marker => marker.id !== id);
+      setSavedMarkers(updatedMarkers);
       })
       .catch(error => {
         console.error('Error deleting marker: ', error);
       });
   };
 
+
+//Sovellusnäkymä
+
 return (
   <ImageBackground source={require('./images/expobackground.png')} style={styles.background}>
+    
+    {/*Näppäimistön esiin tuominen vei muut komponentit sovelluksesta
+    ylöspäin ja teksti-input katosi kokonaan. Löysin siihen seuraavanlaisen
+    KeyboardAvoidingView-metodin StackOverFlowsta, jolla onnistuin estämään
+    muiden komponenttien liikkumisen.
+    
+    app.json-tiedostoon lisätty "android":{"softwareKeyboardLayoutMode": "pan"},"
+
+    Lähde: https://stackoverflow.com/questions/39344140/react-native-how-to-control-what-keyboard-pushes-up */}
+    
     <KeyboardAvoidingView style={styles.container} behavior="padding" enabled>
+      
+   {/*ScrollView mahdollistaa sovelluksen rullaamisen alaspäin, mikäli
+   markereita tallennetaan senverran etteivät ne mahdu oletusnäkymään*/}
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <TextInput
           style={styles.input}
@@ -187,6 +249,10 @@ return (
            style={styles.map}
            initialRegion={mapRegion}
            region={mapRegion}
+
+/*Map liikkui nykien ja verkkaisesti eteenpäin, löysin tähän avun;
+Lähde: https://stackoverflow.com/questions/53181556/react-native-maps-onregionchange-stutters-the-map */
+
            onRegionChangeComplete={setMapRegion}
            showsUserLocation={true}
            onPress={handleMapPress}
@@ -195,11 +261,11 @@ return (
               <Marker
                 key={index}
                 coordinate={marker}
-                title={marker.name || 'Unknown marker'}
+                title={marker.name || 'Unnamed marker'}
               >
                 <Callout>
                   <View>
-                    <Text>{marker.name || 'Unknown marker'}</Text>
+                    <Text>{marker.name || 'Unnamed marker'}</Text>
                   </View>
                 </Callout>
               </Marker>
@@ -215,8 +281,11 @@ return (
 
         
     <View style={styles.savedMarkersContainer}>
-       <Text style={styles.savedMarkersHeader}>Saved Markers:</Text>
+       <Text style={styles.savedMarkersHeader}
+       >Saved Markers:
+       </Text>
         {savedMarkers.map((marker, index) => (
+
     <View key={index} style={styles.savedMarkerContainer}>
         <Text style={styles.savedMarkerText}>
           {`${index + 1}: ${marker.name || 'Unnamed'} - Lat ${marker.latitude}, Lon ${marker.longitude}`}
@@ -228,6 +297,8 @@ return (
     </View>
     ))}
   </View>
+
+{/*Modal-popup ikkuna */}
 
         <Modal
           visible={isModalVisible}
@@ -251,6 +322,9 @@ return (
   );
 }
 
+
+//Tyylit
+
 const styles = StyleSheet.create({
   background: {
     flex: 1,
@@ -273,7 +347,7 @@ const styles = StyleSheet.create({
     borderWidth: 5,
     borderColor: '#ccc',
     borderRadius: 5,
-    backgroundColor: '#fff', // Set background color to white
+    backgroundColor: '#fff',
   },
   buttonContainer: {
     flexDirection: 'row',

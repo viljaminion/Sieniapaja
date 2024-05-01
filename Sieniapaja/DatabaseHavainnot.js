@@ -10,11 +10,11 @@ const DatabaseHavainnot = {
           'CREATE TABLE IF NOT EXISTS markers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, latitude REAL, longitude REAL)',
           [],
           (_, result) => {
-            console.log('Table creation result:', result);
+            console.log('Result:', result);
             resolve();
           },
           (_, error) => {
-            console.error('Error initializing database: ', error);
+            console.error('Error making database: ', error);
             reject(error);
           }
         );

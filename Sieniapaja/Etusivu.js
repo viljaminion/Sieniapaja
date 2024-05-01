@@ -1,10 +1,14 @@
 import React from 'react';
 import { View, Text, ImageBackground, StyleSheet } from 'react-native';
 
+
+//Etusivulla ainoastaan sovelluksen kansikuva,
+//tehty itse Canva-sovelluksella
+
 export default function HomeScreen() {
     return (
         <ImageBackground
-            source={require('./images/Sieniapaja.png')} // Replace './path_to_your_image.jpg' with the actual path to your image file
+            source={require('./images/Sieniapaja.png')}
             style={styles.background}
             resizeMode="stretch"
         >
