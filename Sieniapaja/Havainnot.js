@@ -148,9 +148,12 @@ export default function App() {
   const saveMarkerWithPopup = () => {
     if (coords) {
       console.log('Saving marker:', coords);
+
       const roundedCoords = {
+
 //Koordinaatit supistetaan kolmen desimaalin tarkkuuteen,
 //normaali pyöristys esimerkiksi geokätköilypiireissä
+
         latitude: parseFloat(coords.latitude.toFixed(3)),
         longitude: parseFloat(coords.longitude.toFixed(3)),
         name: markerName //Markerin nimi
@@ -160,6 +163,7 @@ export default function App() {
       DatabaseHavainnot.saveMarker(roundedCoords)
         .then(() => {
           console.log('Marker saved successfully:', roundedCoords);
+
 //Sen onnistuttua, päivitetään lisätty tieto myös savedMarkers arrayyn
 //lokaalisti
 
@@ -169,12 +173,16 @@ export default function App() {
           Alert.alert('Marker saved successfully');
         })
         .catch(error => {
+
 //Mikäli jotain menee vikaan, ilmoitus tulee sekä konsoliin että
 //sovellusnäkymään
+
           console.error('Error saving marker: ', error);
           Alert.alert('Failed to save marker');
         });
+        
 //Mikäli yritetään tallentaa tyhjää tietoa;
+
     } else {
       Alert.alert('Select a location on the map');
     }
@@ -195,10 +203,10 @@ export default function App() {
 
 //Markerin poisto tietokannasta 'Delete'-nappia painettaessa
 
-  const deleteMarker = (id) => {
-    DatabaseHavainnot.deleteMarker(id)
-      .then(() => {
-        console.log('Marker deleted successfully');
+const deleteMarker = (id) => {
+  DatabaseHavainnot.deleteMarker(id)
+    .then(() => {
+      console.log('Marker deleted successfully');
 
 //Tämän jälkeen vielä markerin poisto listalta
 //Päivitetty markerlista, josta on filter-funktion avulla
@@ -206,7 +214,7 @@ export default function App() {
 
 
     const updatedMarkers = savedMarkers.filter(marker => marker.id !== id);
-      setSavedMarkers(updatedMarkers);
+    setSavedMarkers([...updatedMarkers]);
       })
       .catch(error => {
         console.error('Error deleting marker: ', error);

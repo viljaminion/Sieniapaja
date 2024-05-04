@@ -2,6 +2,8 @@ import * as SQLite from 'expo-sqlite';
 
 const db = SQLite.openDatabase('markers.db');
 
+//Tietokannan alustus
+
 const DatabaseHavainnot = {
   init() {
     return new Promise((resolve, reject) => {
@@ -22,6 +24,8 @@ const DatabaseHavainnot = {
     });
   },
 
+//Markerin tallennus
+
   saveMarker(marker) {
     return new Promise((resolve, reject) => {
       db.transaction(tx => {
@@ -39,6 +43,8 @@ const DatabaseHavainnot = {
       });
     });
   },
+
+//Markerien haku
 
   getMarkers() {
     return new Promise((resolve, reject) => {
@@ -61,6 +67,8 @@ const DatabaseHavainnot = {
       });
     });
   },
+
+//Poisto
 
   deleteMarker(id) {
     return new Promise((resolve, reject) => {

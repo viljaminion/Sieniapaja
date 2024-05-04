@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import placeholderPhoto from './images/CollectionLog.png';
 
 
-
+//Alustetaan variaabelit,lupakyselyt sekä modalnäkymät
 export default function App() {
   const [hasPermission, setHasPermission] = useState(null);
   const [imageUris, setImageUris] = useState([]);
@@ -18,6 +18,16 @@ export default function App() {
   const [photoName, setPhotoName] = useState('');
   const cameraRef = useRef(null);
 
+//Kameran sekä mediakirjaston lupakyselyt
+
+useEffect(() => {
+  askForCameraPermission();
+  requestMediaLibraryPermissions();
+}, []);
+
+if (!hasPermission) {
+  return <Text>No access to camera and media library</Text>;
+}
 
   const askForCameraPermission = async () => {
     const { status } = await Camera.requestCameraPermissionsAsync();
@@ -25,13 +35,6 @@ export default function App() {
       console.log('Camera permission denied');
       return;
     }
-
-    const mediaLibraryStatus = await MediaLibrary.requestPermissionsAsync();
-    if (mediaLibraryStatus.status !== 'granted') {
-      console.log('Media library permission denied');
-      return;
-    }
-
     setHasPermission(true);
   };
 
@@ -40,17 +43,20 @@ export default function App() {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status === 'granted') {
         console.log('Media library permissions granted');
-        // Proceed with deleting assets or other operations
+        
       } else {
         console.log('Media library permissions denied');
-        // Handle case where permissions are not granted
+        
       }
     } catch (error) {
-      console.error('Error requesting media library permissions:', error);
-      // Handle any errors that occur during permission request
+      console.error('Error at requesting media library permission:', error);
+      
     }
   };
 
+//Kun käyttäjä ottaa kuvan, seuraava funktio alustaa kuvalle URI:n
+//ja asettaa sen photoUri muuttujaan, sekä avaa Modal-ikkunan
+//kuvan nimeämiselle
   const takePicture = async () => {
     if (cameraRef.current) {
       try {
@@ -63,30 +69,39 @@ export default function App() {
     }
   };
 
+//Kun käyttäjä haluaa valita kuvan kuvakirjastosta seuraava funktio
+//Imagepickerin avulla käyttäjä pääsee käsiksi kuvakirjastoon
+//Mikäli käyttäjä ei peru kuvan valitsemista, asetetaan URI ja avataan Modal
+
   const pickImageFromGallery = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync();
       console.log('ImagePicker Result:', result);
-      const { cancelled, uri } = result.assets[0]; // Directly access URI from the assets array
+      const { canceled, uri } = result.assets[0]; 
       console.log('Image URI:', uri);
-      if (!cancelled && uri) {
-        // Image selected successfully
+      if (!canceled && uri) {
         setPhotoUri(uri);
         setIsNamingModalVisible(true);
-      } else {
-        // Image selection cancelled or URI is undefined
+      }
+      else {
         console.log('Image selection cancelled or URI undefined');
       }
     } catch (error) {
       console.error('Error picking image from gallery:', error);
     }
   };
-  
+
+  //MediaLibraryn avulla sovelluksessa otettu kuva tallentuu puhelimen
+  //kuvakirjastoon, sekä lisää kuvan datan imageUri-hookkiin
+  //joka lopuksi näytetään FlatListisssä
+
+  //Lopuksi funktio sulkee nimeämis-Modalin ja alustaa kuvamuuttujat
+  //tyhjiksi seuraavaa kuvaa varten
   const savePhoto = async () => {
     console.log('Photo URI:', photoUri);
     console.log('Photo Name:', photoName);
   
-    if (!photoUri || !photoName || photoUri.trim() === '' || photoName.trim() === '') {
+    if (!photoUri || !photoName){
       console.error('Photo URI or Name is invalid');
       return;
     }
@@ -105,13 +120,15 @@ export default function App() {
     setPhotoName('');
   };
   
+//Avaa kuvan poiston varmistus-Modal-ikkunan
 
-  const handleDelete = (item) => {
-    setSelectedPhoto(item);
-    setIsNamingModalVisible(false);
+  const handleDelete = (photo) => {
+    setSelectedPhoto(photo);
     setIsConfirmationModalVisible(true);
   };
 
+//Poistaa kuvan, kun käyttäjä varmistaa kuvan poiston edeltävässä Modalissa
+//(Poistaa kuvan myös laitteen mediagalleriasta)
   const deletePhoto = async () => {
     if (!selectedPhoto || !selectedPhoto.id) {
       console.error('Invalid photo data:', selectedPhoto);
@@ -121,31 +138,19 @@ export default function App() {
     const { id } = selectedPhoto;
     try {
       await MediaLibrary.deleteAssetsAsync([id]);
-      setImageUris(imageUris.filter((item) => item.id !== id));
+      setImageUris(imageUris.filter((photo) => photo.id !== id));
     } catch (error) {
       console.error('Error deleting photo:', error);
     }
-    setIsConfirmationModalVisible(false); // Close the confirmation modal after deletion
+    setIsConfirmationModalVisible(false); 
   };
 
+
+//Kameran sulkunappia painaessa kamera sulkeutuu
   const closeCamera = () => {
     setIsCameraOpen(false);
   };
 
-
-
-  useEffect(() => {
-    askForCameraPermission();
-    requestMediaLibraryPermissions(); // Request media library permissions when the app starts
-  }, []);
-
-  if (hasPermission === null) {
-    return <View />;
-  }
-
-  if (!hasPermission) {
-    return <Text>No access to camera and media library</Text>;
-  }
 
   return (
     
@@ -159,7 +164,7 @@ export default function App() {
             ref={cameraRef}
           />
         )}
-        {isCameraOpen && ( // Render buttons only when camera is open
+        {isCameraOpen && ( 
           <View style={styles.buttonContainer}>
             <Button
               title="Take Picture"
@@ -239,6 +244,8 @@ export default function App() {
   );
 }
 
+//Tyylit
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -255,7 +262,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   flatListContent: {
-    paddingTop: 10, // Adjust as needed
+    paddingTop: 10,
   },
   placeholderPhoto: {
     position: 'absolute',
@@ -295,7 +302,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 10,
-    width: '45%',
+    width: '50%',
   },
   cardImage: {
     width: '40%',
